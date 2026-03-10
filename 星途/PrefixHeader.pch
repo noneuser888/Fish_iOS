@@ -1,0 +1,95 @@
+//
+//  PrefixHeader.pch
+//  星途
+//  
+//
+
+#ifndef PrefixHeader_pch
+#define PrefixHeader_pch
+
+//release 屏蔽NSLog
+#ifndef __OPTIMIZE__
+
+#define NSLog(...) NSLog(__VA_ARGS__)
+
+#else
+
+#define NSLog(...) {}
+
+#endif
+
+
+#define Version  [(__bridge NSDictionary *)CFBundleGetInfoDictionary(CFBundleGetMainBundle())objectForKey:@"CFBundleShortVersionString"]
+
+#define NavHight self.navigationController.navigationBar.frame.size.height
+
+#define StatusHeight [[UIApplication sharedApplication] statusBarFrame].size.height
+
+#define wx_base_url @"https://open.weixin.qq.com"
+
+#define configServer @"2"
+
+#define currentVersion @"107"
+
+//#define baseUrl @"http://www.pengyuyan.top:8082"
+#define baseUrl @"http://api.jinyu718.com"
+//#define baseUrl @"http://192.168.34.215:8082"
+
+
+//#import <ReactiveCocoa/ReactiveCocoa.h>
+//#import <ReactiveCocoa/RACEXTScope.h>
+#import <AFNetworking/AFNetworking.h>
+#import <SVProgressHUD/SVProgressHUD.h>
+#import <NetworkExtension/NetworkExtension.h>
+#import <Masonry/Masonry.h>
+#import <MJRefresh/MJRefresh.h>
+#import <SDWebImage/SDWebImage.h>
+#import <DZNEmptyDataSet/UIScrollView+EmptyDataSet.h>
+#import <SDCycleScrollView/SDCycleScrollView.h>
+#import <UIView+FDCollapsibleConstraints/UIView+FDCollapsibleConstraints.h>
+#import <TZImagePickerController/TZImagePickerController.h>
+#import <FDFullscreenPopGesture/UINavigationController+FDFullscreenPopGesture.h>
+#import <JXPagingView/JXPagerView.h>
+#import <JXCategoryView.h>
+#import <JQFMDB/JQFMDB.h>
+#import <ZXCountDownView/ZXCountDownView.h>
+#import <ZFPlayer/ZFPlayer.h>
+#import <ZFPlayer/ZFAVPlayerManager.h>
+#import <ZFPlayer/ZFPlayerControlView.h>
+#import <SocketRocket/SocketRocket.h>
+#import <UMCommon/UMCommon.h>
+#import <YBImageBrowser/YBImageBrowser.h>
+//#import <MUHook/MUHook.h>
+//#import <PPNetworkHelper/PPNetworkHelper.h>
+//#import <MMDrawerController/MMDrawerController.h>
+//#import <JSPatch/JPEngine.h>
+
+#import "RACEXTScope.h"
+
+#import <XXNibBridge.h>
+
+#import "PlatformListVC.h"
+#import "NetworkingManager.h"
+#import "UserInfoModel.h"
+#import "PlatformListVC.h"
+#import "WKWebViewController.h"
+#import "UIViewController+App.h"
+#import "LoginVC.h"
+#import "UISearchBar+App.h"
+
+#import "StoreService.h"
+
+#import "UIImage+App.h"
+#import "UIColor+App.h"
+#import "NSString+App.h"
+#import "UIView+App.h"
+#import "CLGCDTimerManager.h"
+#import "NSDate+App.h"
+#import "LBXPermission.h"
+
+
+#define LBXScan_Define_UI
+#define LBXScan_Define_Native
+
+
+#endif /* PrefixHeader_pch */
