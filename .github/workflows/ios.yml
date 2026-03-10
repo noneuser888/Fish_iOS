@@ -1,0 +1,110 @@
+name: Build and Release Unsigned iOS App
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送带v前缀的标签时触发，例如v1.0.0
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '2.7'
+        bundler-cache: true
+        
+    - name: Install dependencies
+      run: |
+        brew install ldid
+    
+    # - name: Install Cocoapods
+    #   run: |
+    #     gem install cocoapods
+    
+    # - name: Install dependencies
+    #   run: |
+    #     pod install || pod install --repo-update
+      
+    - name: Build for Archive
+      run: |
+        # 修改为你的项目名和scheme名
+        PROJECT_NAME="星途"
+        SCHEME_NAME="星途"
+        BUNDLE_ID="com.jinyu.jinyu718"  # 替换为你的Bundle ID
+        
+        # 创建构建目录
+        mkdir -p build
+        
+        # 修改项目配置，禁用代码签名
+        /usr/libexec/PlistBuddy -c "Delete :CODE_SIGN_IDENTITY" "${PROJECT_NAME}.xcodeproj/project.pbxproj" || true
+        /usr/libexec/PlistBuddy -c "Add :CODE_SIGN_IDENTITY String \"\"" "${PROJECT_NAME}.xcodeproj/project.pbxproj"
+        /usr/libexec/PlistBuddy -c "Delete :CODE_SIGNING_REQUIRED" "${PROJECT_NAME}.xcodeproj/project.pbxproj" || true
+        /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_REQUIRED String NO" "${PROJECT_NAME}.xcodeproj/project.pbxproj"
+        /usr/libexec/PlistBuddy -c "Delete :CODE_SIGNING_ALLOWED" "${PROJECT_NAME}.xcodeproj/project.pbxproj" || true
+        /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_ALLOWED String NO" "${PROJECT_NAME}.xcodeproj/project.pbxproj"
+        
+        # 使用xcodebuild构建应用程序，不需要签名
+        xcodebuild clean archive \
+                  -workspace "${PROJECT_NAME}.xcworkspace" \
+                  -scheme "${SCHEME_NAME}" \
+                  -configuration Release \
+                  -sdk iphoneos \
+                  -archivePath "build/${PROJECT_NAME}.xcarchive" \
+                  CODE_SIGN_IDENTITY="" \
+                  CODE_SIGNING_REQUIRED=NO \
+                  CODE_SIGNING_ALLOWED=NO
+      
+    - name: Create IPA without Signing
+      run: |
+        PROJECT_NAME="星途"
+        SCHEME_NAME="金鱼"
+        APP_PATH="build/${PROJECT_NAME}.xcarchive/Products/Applications/${SCHEME_NAME}.app"
+        
+        # 创建Payload目录
+        mkdir -p Payload
+        
+        # 复制.app到Payload目录
+        ldid -S "${APP_PATH}"
+        cp -r "${APP_PATH}" Payload/
+        
+        # 创建IPA文件
+        VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+        if [ -z "$VERSION" ]; then
+          VERSION=$(date +"%Y%m%d%H%M")
+        fi
+        
+        IPA_NAME="${PROJECT_NAME}-${VERSION}-unsigned.ipa"
+        zip -r "$IPA_NAME" Payload
+        
+        echo "Created unsigned IPA: $IPA_NAME"
+        echo "::set-output name=ipa_path::$IPA_NAME"
+        echo "::set-output name=version::${VERSION}"
+      id: build
+      
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        
+    - name: Upload IPA to Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ steps.build.outputs.ipa_path }}
+        asset_name: ${{ steps.build.outputs.ipa_path }}
+        asset_content_type: application/octet-stream
