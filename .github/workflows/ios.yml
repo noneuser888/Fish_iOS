@@ -1,110 +1,134 @@
-name: Build and Release Unsigned iOS App
+name: Build iOS IPAs
 
 on:
   push:
     tags:
-      - 'v*'  # 当推送带v前缀的标签时触发，例如v1.0.0
-  workflow_dispatch:  # 允许手动触发
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PROJECT_NAME: 星途
+  WORKSPACE_NAME: 星途.xcworkspace
+  SCHEME_NAME: 星途
+  CONFIGURATION: Release
 
 jobs:
   build:
+    name: Build ${{ matrix.variant.id }}
     runs-on: macos-latest
-    
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          # 第一套包：当前默认配置。
+          - id: jinyu
+            display_name: 金鱼
+            bundle_id: com.jinyu718.jinyu
+            app_icon: AppIcon
+            base_url: http://api.jinyu718.com
+
+          # 第二套包：按实际业务修改名称、包名、图标资源名和接口地址。
+          - id: juzi
+            display_name: 橘子
+            bundle_id: com.qwer.juzi
+            app_icon: AppIcon-Alt
+            base_url: http://app.51juzi.xyz
+
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
-      
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: '2.7'
-        bundler-cache: true
-        
-    - name: Install dependencies
-      run: |
-        brew install ldid
-    
-    # - name: Install Cocoapods
-    #   run: |
-    #     gem install cocoapods
-    
-    # - name: Install dependencies
-    #   run: |
-    #     pod install || pod install --repo-update
-      
-    - name: Build for Archive
-      run: |
-        # 修改为你的项目名和scheme名
-        PROJECT_NAME="星途"
-        SCHEME_NAME="星途"
-        BUNDLE_ID="com.jinyu.jinyu718"  # 替换为你的Bundle ID
-        
-        # 创建构建目录
-        mkdir -p build
-        
-        # 修改项目配置，禁用代码签名
-        /usr/libexec/PlistBuddy -c "Delete :CODE_SIGN_IDENTITY" "${PROJECT_NAME}.xcodeproj/project.pbxproj" || true
-        /usr/libexec/PlistBuddy -c "Add :CODE_SIGN_IDENTITY String \"\"" "${PROJECT_NAME}.xcodeproj/project.pbxproj"
-        /usr/libexec/PlistBuddy -c "Delete :CODE_SIGNING_REQUIRED" "${PROJECT_NAME}.xcodeproj/project.pbxproj" || true
-        /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_REQUIRED String NO" "${PROJECT_NAME}.xcodeproj/project.pbxproj"
-        /usr/libexec/PlistBuddy -c "Delete :CODE_SIGNING_ALLOWED" "${PROJECT_NAME}.xcodeproj/project.pbxproj" || true
-        /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_ALLOWED String NO" "${PROJECT_NAME}.xcodeproj/project.pbxproj"
-        
-        # 使用xcodebuild构建应用程序，不需要签名
-        xcodebuild clean archive \
-                  -workspace "${PROJECT_NAME}.xcworkspace" \
-                  -scheme "${SCHEME_NAME}" \
-                  -configuration Release \
-                  -sdk iphoneos \
-                  -archivePath "build/${PROJECT_NAME}.xcarchive" \
-                  CODE_SIGN_IDENTITY="" \
-                  CODE_SIGNING_REQUIRED=NO \
-                  CODE_SIGNING_ALLOWED=NO
-      
-    - name: Create IPA without Signing
-      run: |
-        PROJECT_NAME="星途"
-        SCHEME_NAME="金鱼"
-        APP_PATH="build/${PROJECT_NAME}.xcarchive/Products/Applications/${SCHEME_NAME}.app"
-        
-        # 创建Payload目录
-        mkdir -p Payload
-        
-        # 复制.app到Payload目录
-        ldid -S "${APP_PATH}"
-        cp -r "${APP_PATH}" Payload/
-        
-        # 创建IPA文件
-        VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
-        if [ -z "$VERSION" ]; then
-          VERSION=$(date +"%Y%m%d%H%M")
-        fi
-        
-        IPA_NAME="${PROJECT_NAME}-${VERSION}-unsigned.ipa"
-        zip -r "$IPA_NAME" Payload
-        
-        echo "Created unsigned IPA: $IPA_NAME"
-        echo "::set-output name=ipa_path::$IPA_NAME"
-        echo "::set-output name=version::${VERSION}"
-      id: build
-      
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-        
-    - name: Upload IPA to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.build.outputs.ipa_path }}
-        asset_name: ${{ steps.build.outputs.ipa_path }}
-        asset_content_type: application/octet-stream
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install IPA tools
+        run: brew install ldid
+
+      - name: Build archive
+        env:
+          VARIANT_ID: ${{ matrix.variant.id }}
+          DISPLAY_NAME: ${{ matrix.variant.display_name }}
+          BUNDLE_ID: ${{ matrix.variant.bundle_id }}
+          APP_ICON: ${{ matrix.variant.app_icon }}
+          BASE_URL: ${{ matrix.variant.base_url }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p build
+
+          ARCHIVE_PATH="build/${VARIANT_ID}.xcarchive"
+          BASE_URL_DEFINE="APP_BASE_URL=@\\\"${BASE_URL}\\\""
+
+          xcodebuild clean archive \
+            -workspace "${WORKSPACE_NAME}" \
+            -scheme "${SCHEME_NAME}" \
+            -configuration "${CONFIGURATION}" \
+            -sdk iphoneos \
+            -archivePath "${ARCHIVE_PATH}" \
+            "APP_DISPLAY_NAME=${DISPLAY_NAME}" \
+            "PRODUCT_BUNDLE_IDENTIFIER=${BUNDLE_ID}" \
+            "ASSETCATALOG_COMPILER_APPICON_NAME=${APP_ICON}" \
+            "GCC_PREPROCESSOR_DEFINITIONS=\$(inherited) ${BASE_URL_DEFINE}" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Create unsigned IPA
+        id: package
+        env:
+          VARIANT_ID: ${{ matrix.variant.id }}
+          DISPLAY_NAME: ${{ matrix.variant.display_name }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${VERSION}" = "${GITHUB_REF_NAME}" ]; then
+            VERSION="$(date +'%Y%m%d%H%M')"
+          fi
+
+          ARCHIVE_PATH="build/${VARIANT_ID}.xcarchive"
+          APP_PATH="$(find "${ARCHIVE_PATH}/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "${APP_PATH}" ]; then
+            echo "No .app found in ${ARCHIVE_PATH}/Products/Applications" >&2
+            exit 1
+          fi
+
+          PAYLOAD_DIR="build/${VARIANT_ID}-payload/Payload"
+          IPA_DIR="build/ipa"
+          IPA_NAME="${DISPLAY_NAME}-${VARIANT_ID}-${VERSION}-unsigned.ipa"
+          IPA_PATH="${IPA_DIR}/${IPA_NAME}"
+
+          rm -rf "build/${VARIANT_ID}-payload"
+          mkdir -p "${PAYLOAD_DIR}" "${IPA_DIR}"
+
+          ldid -S "${APP_PATH}"
+          cp -R "${APP_PATH}" "${PAYLOAD_DIR}/"
+
+          (cd "build/${VARIANT_ID}-payload" && zip -qry "../ipa/${IPA_NAME}" Payload)
+
+          echo "ipa_path=${IPA_PATH}" >> "${GITHUB_OUTPUT}"
+          echo "ipa_name=${IPA_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.variant.id }}-ipa
+          path: ${{ steps.package.outputs.ipa_path }}
+          if-no-files-found: error
+
+  release:
+    name: Upload IPAs to GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download IPA artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/**/*.ipa
