@@ -251,6 +251,10 @@ static NSString *platformListTable = @"LoginAuthPlatformList";
         if (model[@"platformName"]) {
             platformName = model[@"platformName"];
         }
+        if(nickname == NULL || platformName == NULL){
+            NSLog(@"");
+        }
+        NSLog(@"model:%@",model);
         if ([nickname containsString:key] || [platformName containsString:key]) {
             [result addObject: model];
         }

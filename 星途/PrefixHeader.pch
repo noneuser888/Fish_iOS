@@ -32,7 +32,10 @@
 #define currentVersion @"107"
 
 //#define baseUrl @"http://www.pengyuyan.top:8082"
-#define baseUrl @"http://api.jinyu718.com"
+#ifndef APP_BASE_URL
+#define APP_BASE_URL @"http://api.jinyu718.com"
+#endif
+#define baseUrl APP_BASE_URL
 //#define baseUrl @"http://192.168.34.215:8082"
 
 
